@@ -36,7 +36,8 @@ a{color:inherit}
 
 /* 머리와 진행선 */
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 24px}
-.brand{font-weight:800;font-size:var(--f2);letter-spacing:-.01em}
+.brand{font-weight:800;font-size:var(--f2);letter-spacing:-.01em;background:none;border:0;padding:8px 0;color:var(--tx);cursor:pointer}
+.brand:hover{text-decoration:underline;text-underline-offset:4px}
 .brand span{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;color:var(--mu);border:1px solid var(--ctl);border-radius:var(--r1);padding:0 6px;vertical-align:1px}
 .ptxt{font-size:13px;color:var(--mu);font-variant-numeric:tabular-nums}
 .tr{display:flex;align-items:center;gap:14px}
@@ -269,7 +270,7 @@ html.still *,html.still *::before,html.still *::after{animation:none!important;t
 <noscript><p style="padding:24px">이 페이지는 자바스크립트를 켜야 참여할 수 있습니다.</p></noscript>
 <div id="live" class="sr" aria-live="polite"></div>
 <div id="tip" role="status" hidden></div>
-<header class="top"><span class="brand">AI 활용 지수<span>시범판</span></span><span class="tr"><span class="ptxt" id="ptxt"></span><button type="button" class="mtog" data-act="motion" aria-pressed="false">움직임 끄기</button></span></header>
+<header class="top"><button type="button" class="brand" data-act="brand" aria-label="AI 활용 지수 시범판 처음 화면으로">AI 활용 지수<span>시범판</span></button><span class="tr"><span class="ptxt" id="ptxt"></span><button type="button" class="mtog" data-act="motion" aria-pressed="false">움직임 끄기</button></span></header>
 <div class="pline" aria-hidden="true"><i id="pbar"></i></div>
 <div class="shell" id="shell">
  <aside class="rail" id="rail" aria-label="영역 진행"></aside>
@@ -508,9 +509,10 @@ class Orb {
   requestAnimationFrame(t => this.loop(t));
   const dt = Math.min(.05, (ts - this.last) / 1000 || 0); this.last = ts;
   if(!RM) this.t += dt;
-  for(const k in this.p) this.p[k] += (this.tp[k] - this.p[k]) * .06;
-  this.fl *= .94;
-  this.hov += ((this.ptr && !RM ? 1 : 0) - this.hov) * .08;
+  const ease = RM ? 1 : .06; // 움직임을 끄면 빛 세기도 목표값으로 바로 맞춰 화면이 완전히 멈춘다
+  for(const k in this.p) this.p[k] += (this.tp[k] - this.p[k]) * ease;
+  this.fl = RM ? 0 : this.fl * .94;
+  this.hov = RM ? 0 : this.hov + ((this.ptr ? 1 : 0) - this.hov) * .08;
   const g = this.g, W = this.c.width, H = this.c.height, d = this.d, t = this.t, p = this.p;
   if(!W || !H) return;
   g.clearRect(0, 0, W, H);
@@ -748,7 +750,7 @@ function finish(){
 function renderResult(){
  const r = RES, st = r.st, lv = LV[st.step - 1];
  const body = `<section class="rs"><h2 class="sh"><span>1</span>내 AI 역량 지형</h2>
-   <div class="rmap"><svg class="map" id="rmap" viewBox="-20 0 340 172" role="img" aria-label="${esc('내 AI 역량 지형: ' + DOMS.map(d => d.ko + ' ' + r.s[d.k]).join(', '))}">${mapSVG('rm', {fog: true, fogc: '#05060B'})}</svg>
+   <div class="rmap"><svg class="map" id="rmap" viewBox="-20 0 340 172" role="img" aria-label="${esc('내 AI 역량 지형: ' + DOMS.map(d => d.ko + ' ' + r.s[d.k]).join(', '))}">${mapSVG('rm', {fog: true, fogc: '#05060B', flow: true})}</svg>
    <div class="mscore">${DOMS.map(d => `<div><b>${numHTML('me-' + d.k, r.s[d.k])}</b><span>${esc(d.ko)}</span><small data-avg="${d.k}"></small></div>`).join('')}</div>
    <p class="leg" id="r-leg"></p></div></section>
   <section class="rs"><h2 class="sh"><span>2</span>총점과 내 위치</h2>
@@ -774,6 +776,7 @@ function renderResult(){
    T.push(setTimeout(() => animate($('#rbody')), RM ? 0 : 900));
    updateResultAgg(); renderStatus();
   }});
+ syncMotion();
  topbar();
 }
 function howHTML(r){
@@ -958,6 +961,10 @@ document.addEventListener('click', e => {
  else if(a === 'dash') dashView();
  else if(a === 'undash') DASH_FROM === 'result' && RES ? renderResult() : startView();
  else if(a === 'home'){ RES = null; startView(); }
+ else if(a === 'brand'){ // 왼쪽 위 로고: 처음 화면으로. 문항을 푸는 중이면 한 번 묻는다
+  if((VIEW === 'q' || VIEW === 'domain') && !confirm('풀던 문항은 저장되지 않습니다. 처음 화면으로 갈까요?')) return;
+  RES = null; startView();
+ }
  else if(a === 'motion'){ RM = !RM; try { localStorage.setItem('aiIndexMotion', RM ? 'off' : 'on'); } catch(err){} if(RM && TYPING) TYPING(); syncMotion(); }
 });
 document.addEventListener('change', e => { if(e.target.id === 'agree'){ S.agree = e.target.checked; if(S.agree) $('#err').hidden = true; } });
