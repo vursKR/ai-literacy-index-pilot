@@ -39,6 +39,9 @@ a{color:inherit}
 .brand{font-weight:800;font-size:var(--f2);letter-spacing:-.01em}
 .brand span{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;color:var(--mu);border:1px solid var(--ctl);border-radius:var(--r1);padding:0 6px;vertical-align:1px}
 .ptxt{font-size:13px;color:var(--mu);font-variant-numeric:tabular-nums}
+.tr{display:flex;align-items:center;gap:14px}
+.mtog{background:none;border:0;padding:8px 0;color:var(--mu);font-size:13px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;white-space:nowrap}
+.mtog:hover{color:var(--tx)}
 .pline{height:2px;background:var(--line);margin:0 24px}
 .pline i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--key2) 0%,#C4BAFF 50%,var(--key2) 100%);background-size:200% 100%;animation:flowx 2.8s linear infinite;transition:width .6s ease}
 @keyframes flowx{to{background-position:-200% 0}}
@@ -258,9 +261,7 @@ details.how[open] summary::before{content:"−"}
 
 .foot{font-size:var(--f1);color:var(--mu);padding:20px 24px 36px;border-top:1px solid var(--line);text-align:center}
 .foot a{color:var(--tx)}
-@media (prefers-reduced-motion:reduce){
- *,*::before,*::after{animation:none!important;transition:none!important}
-}
+html.still *,html.still *::before,html.still *::after{animation:none!important;transition:none!important}
 </style>
 </head>
 <body>
@@ -268,7 +269,7 @@ details.how[open] summary::before{content:"−"}
 <noscript><p style="padding:24px">이 페이지는 자바스크립트를 켜야 참여할 수 있습니다.</p></noscript>
 <div id="live" class="sr" aria-live="polite"></div>
 <div id="tip" role="status" hidden></div>
-<header class="top"><span class="brand">AI 활용 지수<span>시범판</span></span><span class="ptxt" id="ptxt"></span></header>
+<header class="top"><span class="brand">AI 활용 지수<span>시범판</span></span><span class="tr"><span class="ptxt" id="ptxt"></span><button type="button" class="mtog" data-act="motion" aria-pressed="false">움직임 끄기</button></span></header>
 <div class="pline" aria-hidden="true"><i id="pbar"></i></div>
 <div class="shell" id="shell">
  <aside class="rail" id="rail" aria-label="영역 진행"></aside>
@@ -280,7 +281,9 @@ details.how[open] summary::before{content:"−"}
 (() => {
 'use strict';
 const DEMO = new URLSearchParams(location.search).get('demo') === '1';
-const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// 움직임은 Windows 설정과 무관하게 기본으로 켠다. 머리의 「움직임 끄기」로 누구나 멈출 수 있고(웹 접근성 2.2.2), 고른 값은 이 브라우저에만 남는다
+let RM = (() => { try { return localStorage.getItem('aiIndexMotion') === 'off'; } catch(e){ return false; } })();
+document.documentElement.classList.toggle('still', RM);
 const VERSION = 'pilot-v2';
 // ponytail: 서버가 칸마다 평균만 주므로 백분위는 정규분포(표준편차 가정)로 추정한다. 서버가 점수 구간별 도수를 주면 실제 분포로 바꾼다.
 const SD = 18;
@@ -560,7 +563,7 @@ function mapSVG(id, o){
  let s = `<defs><filter id="${id}-f" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="7"/></filter></defs>`;
  [50, 100].forEach(g => { s += `<line x1="-20" x2="320" y1="${MB - MP * g / 100}" y2="${MB - MP * g / 100}" stroke="#23253A" stroke-dasharray="2 5"/>`; });
  DOMS.forEach((d, i) => { // flow: 언덕이 느리게 물결치고 능선을 따라 빛 입자가 흐른다(검사 화면 레일)
-  const og = `transform-origin:${CX(i)}px ${MB}px`, ridge = hillD(i).slice(0, -1), flow = o.flow && !RM;
+  const og = `transform-origin:${CX(i)}px ${MB}px`, ridge = hillD(i).slice(0, -1), flow = o.flow;
   const dots = flow ? [0, 1].map(k => `<circle r="1.8" fill="#F4F4F8" opacity="0"><animateMotion dur="5.5s" begin="${-(k * 2.75 + i * .9).toFixed(2)}s" repeatCount="indefinite" path="${ridge}"/><animate attributeName="opacity" values="0;.9;.9;0" keyTimes="0;.2;.8;1" dur="5.5s" begin="${-(k * 2.75 + i * .9).toFixed(2)}s" repeatCount="indefinite"/></circle>`).join('') : '';
   s += `<g class="hill" data-d="${d.k}" style="${og};transform:scaleY(.06)"><g class="${flow ? 'wob' : ''}" style="${og};animation-delay:${-(i * 1.1).toFixed(1)}s"><path d="${hillD(i)}" fill="#6EE7F9" fill-opacity=".2" stroke="#6EE7F9" stroke-width="1.5" vector-effect="non-scaling-stroke"/>${dots}</g></g>`;
  });
@@ -652,6 +655,7 @@ function railPaint(){
  $('#rail').innerHTML = `<p class="rl">영역 진행</p><ol class="rsteps" id="rsteps">${DOMS.map(d => `<li data-d="${d.k}"><b>${d.k}</b><span>${esc(d.ko)}</span><em>?</em></li>`).join('')}</ol>
   <svg class="map" id="qmap" viewBox="-20 0 340 172" aria-hidden="true">${mapSVG('qm', {fog: true, fogc: '#05060B', flow: true})}</svg><p class="rcap">문항을 풀수록 내 역량 지형이 드러납니다.</p>`;
  setMap($('#qmap'), {A:0, B:0, C:0, D:0, E:0}, {A:1, B:1, C:1, D:1, E:1});
+ syncMotion();
 }
 function progress(){
  const done = S.rec.filter(Boolean), sc = domScores(done), fog = {}, now = SLOT[S.pos];
@@ -954,6 +958,7 @@ document.addEventListener('click', e => {
  else if(a === 'dash') dashView();
  else if(a === 'undash') DASH_FROM === 'result' && RES ? renderResult() : startView();
  else if(a === 'home'){ RES = null; startView(); }
+ else if(a === 'motion'){ RM = !RM; try { localStorage.setItem('aiIndexMotion', RM ? 'off' : 'on'); } catch(err){} if(RM && TYPING) TYPING(); syncMotion(); }
 });
 document.addEventListener('change', e => { if(e.target.id === 'agree'){ S.agree = e.target.checked; if(S.agree) $('#err').hidden = true; } });
 document.addEventListener('keydown', e => {
@@ -970,6 +975,12 @@ document.addEventListener('keydown', e => {
  }
 });
 
+function syncMotion(){ // 움직임 켜고 끄기: CSS 애니메이션(html.still), 지형 SVG 흐름, 버튼 글자를 함께 맞춘다
+ document.documentElement.classList.toggle('still', RM);
+ const b = $('[data-act="motion"]'); b.setAttribute('aria-pressed', RM); b.textContent = RM ? '움직임 켜기' : '움직임 끄기';
+ $$('svg').forEach(s => { if(s.pauseAnimations) RM ? s.pauseAnimations() : s.unpauseAnimations(); });
+}
+syncMotion();
 startView();
 refreshAgg();
 setInterval(() => { if(document.visibilityState === 'visible' && ['start', 'result', 'dash'].includes(VIEW)) refreshAgg(); }, 30000);
