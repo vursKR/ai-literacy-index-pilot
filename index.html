@@ -40,7 +40,8 @@ a{color:inherit}
 .brand span{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;color:var(--mu);border:1px solid var(--ctl);border-radius:var(--r1);padding:0 6px;vertical-align:1px}
 .ptxt{font-size:13px;color:var(--mu);font-variant-numeric:tabular-nums}
 .pline{height:2px;background:var(--line);margin:0 24px}
-.pline i{display:block;height:100%;width:0;background:var(--key2);transition:width .6s ease}
+.pline i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--key2) 0%,#C4BAFF 50%,var(--key2) 100%);background-size:200% 100%;animation:flowx 2.8s linear infinite;transition:width .6s ease}
+@keyframes flowx{to{background-position:-200% 0}}
 
 /* 무대 */
 .shell{display:grid;grid-template-columns:minmax(0,1fr);min-height:calc(100vh - 60px)}
@@ -159,7 +160,10 @@ button.num:hover{border-color:var(--key2);background:var(--keyt)}
 .rsteps li{position:relative;display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;padding:7px 10px;border-radius:var(--r2);color:var(--mu)}
 .rsteps li b{width:26px;height:26px;border-radius:7px;border:1px solid var(--ctl);display:grid;place-items:center;font-size:var(--f1)}
 .rsteps li em{font-style:normal;font-weight:800;font-variant-numeric:tabular-nums;color:var(--mu)}
-.rsteps li.now{background:var(--s1);color:var(--tx);font-weight:700}
+.rsteps li.now{background:linear-gradient(100deg,var(--s1) 38%,rgba(139,123,255,.2) 50%,var(--s1) 62%);background-size:260% 100%;animation:sweep 4s ease-in-out infinite;color:var(--tx);font-weight:700}
+@keyframes sweep{from{background-position:110% 0}to{background-position:-10% 0}}
+.rsteps li.now b{animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{50%{box-shadow:0 0 0 5px var(--keyt),0 0 14px rgba(139,123,255,.55)}}
 .rsteps li.now b{background:var(--key);border-color:var(--key);color:#fff}
 .rsteps li.done b{color:var(--sub);border-color:var(--sub)}
 .rsteps li.done em{color:var(--sub)}
@@ -169,7 +173,12 @@ button.num:hover{border-color:var(--key2);background:var(--keyt)}
 
 /* 역량 지형 */
 .map{display:block;width:100%;height:auto;overflow:visible}
-.hill{transform-box:fill-box;transform-origin:50% 100%;transition:transform 1s cubic-bezier(.2,.8,.2,1)}
+.hill,.wob{transform-box:view-box}
+.hill{transition:transform 1s cubic-bezier(.2,.8,.2,1)}
+.wob{animation:wob 5.5s ease-in-out infinite alternate}
+@keyframes wob{from{transform:scaleY(.96)}to{transform:scaleY(1.04)}}
+.mist{transform-box:fill-box;transform-origin:50% 50%;animation:mist 6s ease-in-out infinite alternate}
+@keyframes mist{to{transform:translateX(4px) scale(1.07)}}
 .fog{transition:opacity .9s ease}
 .avg{clip-path:inset(0 100% 0 0);transition:clip-path 1.2s ease}
 .avg.on{clip-path:inset(0 0 0 0)}
@@ -470,7 +479,8 @@ function animate(root){
  });
 }
 
-/* ── AI 구체: 입자 구체 + 빛 고리와 유체. 말할 때 밝아지고, 기다릴 때 잔잔하고, 맞히면 번쩍, 틀리면 흩어졌다 모인다 ── */
+/* ── AI 구체: 입자 구체 + 빛 고리와 유체. 말할 때 밝아지고, 기다릴 때 잔잔하고, 맞히면 번쩍, 틀리면 흩어졌다 모인다.
+      마우스를 올리면 커서 주변 입자가 밀려 흩어졌다 스프링처럼 돌아오고, 누르면 그 자리에서 한 번 퍼진다 ── */
 class Orb {
  constructor(){
   this.c = document.createElement('canvas'); this.c.className = 'orb'; this.c.setAttribute('aria-hidden', 'true');
@@ -478,6 +488,13 @@ class Orb {
   this.p = {e: .2, g: .45, s: 0}; this.set('idle');
   this.pts = [];
   for(let i = 0; i < 2200; i++){ const y = 1 - 2 * Math.random(), r = Math.sqrt(1 - y * y), th = Math.random() * 6.2832, sh = 1 + (Math.random() - .5) * .06; this.pts.push([Math.cos(th) * r * sh, y * sh, Math.sin(th) * r * sh, Math.random()]); }
+  this.off = new Float32Array(this.pts.length * 4); // 입자마다 밀려난 거리(x, y)와 속도(vx, vy), 캔버스 픽셀 단위
+  this.ptr = null; this.boom = null; this.hov = 0;
+  const at = e => { const r = this.c.getBoundingClientRect(); return {x: (e.clientX - r.left) * this.d, y: (e.clientY - r.top) * this.d}; };
+  this.c.addEventListener('pointermove', e => { this.ptr = at(e); });
+  this.c.addEventListener('pointerdown', e => { this.ptr = at(e); this.boom = at(e); });
+  ['pointerleave', 'pointercancel'].forEach(n => this.c.addEventListener(n, () => { this.ptr = null; }));
+  this.c.addEventListener('pointerup', e => { if(e.pointerType !== 'mouse') this.ptr = null; });
   new ResizeObserver(() => this.fit()).observe(this.c);
   requestAnimationFrame(ts => this.loop(ts));
  }
@@ -490,10 +507,11 @@ class Orb {
   if(!RM) this.t += dt;
   for(const k in this.p) this.p[k] += (this.tp[k] - this.p[k]) * .06;
   this.fl *= .94;
+  this.hov += ((this.ptr && !RM ? 1 : 0) - this.hov) * .08;
   const g = this.g, W = this.c.width, H = this.c.height, d = this.d, t = this.t, p = this.p;
   if(!W || !H) return;
   g.clearRect(0, 0, W, H);
-  const glow = Math.min(1.6, p.g + this.fl * .8);
+  const glow = Math.min(1.6, p.g + this.fl * .8 + this.hov * .25);
   const cx = W / 2, cy = H / 2, R = Math.min(W, H) * .31 * (1 + .02 * Math.sin(t * 1.3) + .035 * p.e * Math.sin(t * 7.5));
   g.globalCompositeOperation = 'lighter';
   const gr = g.createRadialGradient(cx, cy, R * .2, cx, cy, R * 1.9);
@@ -515,12 +533,20 @@ class Orb {
   }
   g.shadowBlur = 0; g.fillStyle = '#fff';
   const ry = t * .28, cr = Math.cos(ry), sr = Math.sin(ry), ct = Math.cos(.35), st = Math.sin(.35), sz = Math.max(1, W / 260);
-  for(const [x, y, z, n] of this.pts){
+  const off = this.off, ptr = RM ? null : this.ptr, rad = R * .45, rad2 = rad * rad, push = R * .045, boom = RM ? null : this.boom, brad = R * .9;
+  this.boom = null;
+  this.pts.forEach(([x, y, z, n], i) => {
    let X = x * cr + z * sr, Z = -x * sr + z * cr; const Y = y * ct - Z * st; Z = y * st + Z * ct;
-   const j = 1 + p.e * .07 * Math.sin(t * 4 + n * 40) + p.s * (n - .2) * .9, pe = 1 / (1 - Z * .28), a = (Z + 1) / 2;
-   g.globalAlpha = (.12 + .8 * a) * Math.min(1, .55 + glow * .4);
-   const s = (.45 + a) * sz; g.fillRect(cx + X * R * 1.08 * j * pe - s / 2, cy + Y * R * 1.08 * j * pe - s / 2, s, s);
-  }
+   const j = 1 + p.e * .07 * Math.sin(t * 4 + n * 40) + .012 * Math.sin(t * 1.7 + n * 30) + p.s * (n - .2) * .9, pe = 1 / (1 - Z * .28), a = (Z + 1) / 2;
+   const bx = cx + X * R * 1.08 * j * pe, by = cy + Y * R * 1.08 * j * pe, o = i * 4;
+   let ox = off[o], oy = off[o + 1], vx = off[o + 2], vy = off[o + 3];
+   if(ptr){ const dx = bx + ox - ptr.x, dy = by + oy - ptr.y, q = dx * dx + dy * dy; if(q < rad2){ const dd = Math.sqrt(q) || 1, f = (1 - dd / rad) * push * (.35 + .65 * a); vx += dx / dd * f; vy += dy / dd * f; } }
+   if(boom){ const dx = bx + ox - boom.x, dy = by + oy - boom.y, dd = Math.hypot(dx, dy) || 1; if(dd < brad){ const f = (1 - dd / brad) * R * .16 * (.4 + .6 * a); vx += dx / dd * f; vy += dy / dd * f; } }
+   vx = (vx - ox * .06) * .86; vy = (vy - oy * .06) * .86; ox += vx; oy += vy; // 스프링으로 제자리에 돌아온다
+   off[o] = ox; off[o + 1] = oy; off[o + 2] = vx; off[o + 3] = vy;
+   g.globalAlpha = (.12 + .8 * a) * Math.min(1, .55 + glow * .4) * (.85 + .15 * Math.sin(t * 2 + n * 50));
+   const s = (.45 + a) * sz; g.fillRect(bx + ox - s / 2, by + oy - s / 2, s, s);
+  });
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
  }
 }
@@ -531,11 +557,15 @@ $('#slot').appendChild(ORB.c);
 const MB = 132, MP = 104, CX = i => 60 * i + 30;
 function hillD(i){ const cx = CX(i), x0 = cx - 46, x1 = cx + 46, top = MB - MP; return `M${x0} ${MB}C${x0 + 24} ${MB} ${cx - 21} ${top} ${cx} ${top}S${x1 - 24} ${MB} ${x1} ${MB}Z`; }
 function mapSVG(id, o){
- let s = `<defs><filter id="${id}-f" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7"/></filter></defs>`;
+ let s = `<defs><filter id="${id}-f" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="7"/></filter></defs>`;
  [50, 100].forEach(g => { s += `<line x1="-20" x2="320" y1="${MB - MP * g / 100}" y2="${MB - MP * g / 100}" stroke="#23253A" stroke-dasharray="2 5"/>`; });
- DOMS.forEach((d, i) => { s += `<path class="hill" data-d="${d.k}" d="${hillD(i)}" fill="#6EE7F9" fill-opacity=".2" stroke="#6EE7F9" stroke-width="1.5" vector-effect="non-scaling-stroke" style="transform:scaleY(.06)"/>`; });
+ DOMS.forEach((d, i) => { // flow: 언덕이 느리게 물결치고 능선을 따라 빛 입자가 흐른다(검사 화면 레일)
+  const og = `transform-origin:${CX(i)}px ${MB}px`, ridge = hillD(i).slice(0, -1), flow = o.flow && !RM;
+  const dots = flow ? [0, 1].map(k => `<circle r="1.8" fill="#F4F4F8" opacity="0"><animateMotion dur="5.5s" begin="${-(k * 2.75 + i * .9).toFixed(2)}s" repeatCount="indefinite" path="${ridge}"/><animate attributeName="opacity" values="0;.9;.9;0" keyTimes="0;.2;.8;1" dur="5.5s" begin="${-(k * 2.75 + i * .9).toFixed(2)}s" repeatCount="indefinite"/></circle>`).join('') : '';
+  s += `<g class="hill" data-d="${d.k}" style="${og};transform:scaleY(.06)"><g class="${flow ? 'wob' : ''}" style="${og};animation-delay:${-(i * 1.1).toFixed(1)}s"><path d="${hillD(i)}" fill="#6EE7F9" fill-opacity=".2" stroke="#6EE7F9" stroke-width="1.5" vector-effect="non-scaling-stroke"/>${dots}</g></g>`;
+ });
  s += `<line x1="-20" x2="320" y1="${MB}" y2="${MB}" stroke="#5F6285"/>`;
- if(o.fog) DOMS.forEach((d, i) => { s += `<rect class="fog" data-d="${d.k}" x="${CX(i) - 32}" y="${MB - MP - 14}" width="64" height="${MP + 16}" rx="22" fill="${o.fogc}" filter="url(#${id}-f)"/><text class="fog" data-d="${d.k}" x="${CX(i)}" y="${MB - 34}" text-anchor="middle" font-size="22" font-weight="800" fill="#5F6285">?</text>`; });
+ if(o.fog) DOMS.forEach((d, i) => { s += `<rect class="fog${o.flow ? ' mist' : ''}" data-d="${d.k}" style="animation-delay:${-(i * 1.3).toFixed(1)}s" x="${CX(i) - 32}" y="${MB - MP - 14}" width="64" height="${MP + 16}" rx="22" fill="${o.fogc}" filter="url(#${id}-f)"/><text class="fog" data-d="${d.k}" x="${CX(i)}" y="${MB - 34}" text-anchor="middle" font-size="22" font-weight="800" fill="#5F6285">?</text>`; });
  s += `<polyline class="avg" points="" fill="none" stroke="#F4F4F8" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round"/>`;
  DOMS.forEach((d, i) => { s += `<text x="${CX(i)}" y="${MB + 20}" text-anchor="middle" font-size="10" font-weight="800" fill="#9496AE">${d.k}</text>`; });
  return s;
@@ -620,7 +650,7 @@ function consentView(){
 /* ── 문항 ── */
 function railPaint(){
  $('#rail').innerHTML = `<p class="rl">영역 진행</p><ol class="rsteps" id="rsteps">${DOMS.map(d => `<li data-d="${d.k}"><b>${d.k}</b><span>${esc(d.ko)}</span><em>?</em></li>`).join('')}</ol>
-  <svg class="map" id="qmap" viewBox="-20 0 340 172" aria-hidden="true">${mapSVG('qm', {fog: true, fogc: '#05060B'})}</svg><p class="rcap">문항을 풀수록 내 역량 지형이 드러납니다.</p>`;
+  <svg class="map" id="qmap" viewBox="-20 0 340 172" aria-hidden="true">${mapSVG('qm', {fog: true, fogc: '#05060B', flow: true})}</svg><p class="rcap">문항을 풀수록 내 역량 지형이 드러납니다.</p>`;
  setMap($('#qmap'), {A:0, B:0, C:0, D:0, E:0}, {A:1, B:1, C:1, D:1, E:1});
 }
 function progress(){
