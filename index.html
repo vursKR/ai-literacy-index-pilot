@@ -606,6 +606,7 @@ function qShow(){
  const it = S.cur = pickItem(S.pos, S.rec, S.used); S.t0 = Date.now();
  const d = DOM[it.d], streak = streakOf(S.rec);
  $('#qdom').innerHTML = `${lt(it.d)} ${dname(it.d)} <span class="fine">· ${S.pos + 1} / 10</span>`;
+ progress(); // 새 문항마다 위쪽 진행 숫자도 같은 번호로
  $('#qtags').innerHTML = (streak >= 2 ? `<span class="tag streak">연속 정답 ${streak}</span>` : '') + (it.lv === 'hard' ? '<span class="tag" title="앞 문항을 맞혀 한 단계 어려운 문항입니다">난이도 ▲</span>' : '');
  $$('#mkey li').forEach(li => li.classList.toggle('now', li.dataset.d === it.d));
  $('#qslot').innerHTML = `<div class="qcard" id="qcard"><div class="qinner"><div class="qface" id="qfront">${frontHTML(it)}</div><div class="qface qback" id="qback" inert></div></div></div>`;
